@@ -1,11 +1,15 @@
 package routes
 
 import (
+	"os"
+	"strconv"
 	"time"
 
+	"github.com/Silify/URLShortener/database"
 	"github.com/Silify/URLShortener/helpers"
 	"github.com/asaskevich/govalidator"
 	"github.com/gofiber/fiber"
+	"github.com/redis/go-redis/v9"
 )
 
 type request struct {
@@ -22,10 +26,6 @@ type response struct {
 	XRateLimitRest time.Duration `json:"rate_limit_reset"`
 }
 
-func ResolveURL(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
-}
-
 func ShortenURL(c *fiber.Ctx) error {
 	body := new(request)
 
@@ -33,7 +33,26 @@ func ShortenURL(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cannot parse JSON"})
 	}
 
-	// TODO: rate limit
+	// IP rate limit
+	r2 := database.CreateClient(1)
+	defer r2.Close()
+
+	val, err := r2.Get(database.Ctx, c.IP()).Result()
+	if err == redis.Nil {
+		_ = r2.Set(database.Ctx, c.IP(), os.Getenv("API_QUOTA"), 30*60*time.Second).Err()
+	} else if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	} else {
+		vaInt, _ := strconv.Atoi(val)
+		if vaInt <= 0 {
+			limit, _ := r2.TTL(database.Ctx, c.IP()).Result()
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"error":            "rate limit exceeded",
+				"rate_limit_reset": limit / time.Nanosecond / time.Minute,
+			})
+
+		}
+	}
 
 	if !govalidator.IsURL(body.URL) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid URL"})
@@ -42,6 +61,10 @@ func ShortenURL(c *fiber.Ctx) error {
 	if !helpers.RemoveDomainError(body.URL) {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "service unavailable"})
 	}
+
+	body.URL, _ = helpers.EnforceHTTP(body.URL)
+
+	r2.Decr(database.Ctx, c.IP())
 
 	return nil
 }
