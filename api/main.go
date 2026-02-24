@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Silify/URLShortener/database"
 	"github.com/Silify/URLShortener/routes"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/logger"
@@ -21,6 +22,9 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	database.Init()
+	defer database.Close()
 
 	app := fiber.New()
 	app.Use(logger.New())

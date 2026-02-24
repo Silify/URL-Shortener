@@ -15,8 +15,7 @@ func ResolveURL(c fiber.Ctx) error {
 			JSON(fiber.Map{"error": "missing short code"})
 	}
 
-	r := database.CreateClient(0)
-	defer r.Close()
+	r := database.Client0
 
 	value, err := r.Get(database.Ctx, shortCode).Result()
 	if err == redis.Nil {
@@ -29,8 +28,7 @@ func ResolveURL(c fiber.Ctx) error {
 	}
 
 	// Increment global counter
-	rInr := database.CreateClient(1)
-	defer rInr.Close()
+	rInr := database.Client1
 
 	if err := rInr.Incr(database.Ctx, "counter").Err(); err != nil {
 		log.Println(err)
