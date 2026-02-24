@@ -2,11 +2,11 @@ package routes
 
 import (
 	"github.com/Silify/URLShortener/database"
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v3"
 	"github.com/redis/go-redis/v9"
 )
 
-func ResolveURL(c *fiber.Ctx) error {
+func ResolveURL(c fiber.Ctx) error {
 	url := c.Params("url")
 
 	r := database.CreateClient(0)
@@ -24,7 +24,7 @@ func ResolveURL(c *fiber.Ctx) error {
 
 	_ = rInr.Incr(database.Ctx, "counter")
 
-	c.Redirect(value, 301)
+	c.Redirect().Status(302).To(value)
 
 	return nil
 }
