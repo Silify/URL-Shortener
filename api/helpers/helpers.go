@@ -1,20 +1,15 @@
 package helpers
 
 import (
-	"net/url"
 	"os"
 	"strings"
 )
 
-func EnforceHTTP(rawUrl string) (string, error) {
-	url, err := url.Parse(rawUrl)
-	if err != nil {
-		return "", err
+func EnforceHTTP(rawURL string) (string, error) {
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		return "https://" + rawURL, nil
 	}
-	if url.Scheme != "http" {
-		return "https://" + rawUrl, nil
-	}
-	return rawUrl, nil
+	return rawURL, nil
 }
 
 func RemoveDomainError(rawUrl string) bool {
