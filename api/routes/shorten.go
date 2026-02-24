@@ -9,6 +9,7 @@ import (
 	"github.com/Silify/URLShortener/helpers"
 	"github.com/asaskevich/govalidator"
 	"github.com/gofiber/fiber"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -63,6 +64,34 @@ func ShortenURL(c *fiber.Ctx) error {
 	}
 
 	body.URL, _ = helpers.EnforceHTTP(body.URL)
+
+	var id string
+	if body.CustomShort == "" {
+		id = uuid.New().String()[:6]
+	} else {
+		id = body.CustomShort
+	}
+
+	r := database.CreateClient(0)
+	defer r.Close()
+
+	val, _ = r.Get(database.Ctx, id).Result()
+	if val != "" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "URL custom short is already in use",
+		})
+	}
+
+	if body.Expiry == 0 {
+		body.Expiry = 24
+	}
+
+	_, err = r.Set(database.Ctx, id, body.URL, body.Expiry*3600*time.Second).Result()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+		})
+	}
 
 	r2.Decr(database.Ctx, c.IP())
 
